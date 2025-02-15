@@ -19,66 +19,121 @@
   <!-- Auto Complete -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tarekraafat/autocomplete.js@7.2.0/dist/css/autoComplete.min.css">
   <link rel="stylesheet" type="text/css" href="{% static 'style.css' %}">
-<script src="https://unpkg.com/swiper/swiper-bundle.min.js"></script>
-<script src="{% static 'Main.js' %}"></script>
 
-
-  <script type="text/javascript">
-    var films = {{ suggestions|safe }};
-  </script>
-   
-
+  <script src="https://unpkg.com/swiper/swiper-bundle.min.js"></script>
+  <script src="{% static 'Main.js' %}"></script>
 </head>
 
-<body id="content" style="font-family: 'Noto Sans JP', sans-serif;">
-<div class="with-bg-size" style="position:fixed; top:0px; left:0px; z-index:-2; width:100%; margin:auto;"></div>
+<body id="content" style="font-family: 'Noto Sans JP', sans-serif; color: white">
+  <div class="with-bg-size" style="position:fixed; top:0px; left:0px; z-index:-2; width:100%; margin:auto;"></div>
 
+  <center><h1>Movie Recommendation System</h1></center>
 
-    <center><h1>Movie Recommendation System</h1></center>
+  <div class="form-group shadow-textarea text-center" style="margin-top: 30px; color: white;">
+    <input type="text" name="movie" class="movie form-control" id="movieSearch" autocomplete="off"
+           placeholder="Enter the Movie Name"
+           style="background-color: #ffffff; border-color:#ffffff; width: 60%; color: #181818" required/>
+    <br>
+  </div>
 
-    <div class="form-group shadow-textarea" style="margin-top: 30px; text-align: center; color: white;">
-      <input type="text" name="movie" class="movie form-control" id="movieSearch" autocomplete="off" placeholder="Enter the Movie Name" style="background-color: #ffffff; border-color:#ffffff; width: 60%; color: #181818" required />
-      <br>
-    </div>
-
-    <div class="form-group" style="text-align: center;">
-      <button class="btn btn-primary btn-block movie-button" style="background-color: #e50914; text-align: center; border-color: #e50914; width:120px;" onclick="getRecommendations()">Enter</button><br><br>
-    </div>
+  <div class="form-group text-center">
+    <button class="btn btn-primary movie-button"
+            style="background-color: #e50914; border-color: #e50914; width:120px;"
+            onclick="getRecommendations()">Enter
+    </button><br><br>
   </div>
 
   <div id="loader" class="text-center"></div>
 
-  <div class="fail">
-    <center><h3>Sorry! The movie you requested is not in our database. 
-    Please check the spelling or try with other movies!</h3></center>
+  <div class="fail text-center">
+    <h3 id="error-message" style="display: none;">Sorry! The movie you requested is not in our database.
+      Please check the spelling or try with other movies!</h3>
   </div>
 
-  <div class="results">
-    <center>
-      <h2 id="name" class="text-uppercase"></h2>
-    </center>
+  <div class="results text-center">
+    <h2 id="movie-title" class="text-uppercase"></h2>
+    <img id="movie-poster" class="img-fluid rounded" alt="">
+    <div class="results text-center">
+    <p id="movie-overview" class="movie-overview"></p>
+    <h4 id="movie-genres" class="movie-details"></h4>
+    <h4 id="movie-release-date" class="movie-details"></h4>
+    <h4 id="movie-runtime" class="movie-details"></h4>
+</div>
+
+    <!-- Like & Dislike Buttons -->
+<div id="like-dislike-section" class="mt-3 text-center">
+    <button id="like-button" onclick="likeDislike('like')" class="btn btn-success">
+        Like 👍 <span id="likes">0</span>
+    </button>
+    <button id="dislike-button" onclick="likeDislike('dislike')" class="btn btn-danger">
+        Dislike 👎 <span id="dislikes">0</span>
+    </button>
+</div>
+
+    <!-- Similar Movies Section -->
+    <h3 class="mt-4">Similar Movies</h3>
+    <div id="similar-movies" class="row justify-content-center"></div>
   </div>
 
-  <div class="footer">Made with<span style="font-size:150%; color:red;"> &hearts; </span>by Kamakshi</div>
-
-  <script src="https://cdn.jsdelivr.net/npm/@tarekraafat/autocomplete.js@7.2.0/dist/js/autoComplete.min.js"></script>
-  <script src="{% static 'autocomplete.js' %}"></script>
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
-  <script src="{% static 'recommend.js' %}"></script>
 
   <script>
+      function getCSRFToken() {
+    return fetch("/like-dislike/")
+        .then(response => response.json())
+        .then(data => data.csrfToken);
+}
     function getRecommendations() {
-      var query = $("#movieSearch").val();
-      $.get("/recommend/", { query: query }, function(data) {
-          var html = "<ul>";
-          data.movies.forEach(movie => {
-              html += `<li>${movie.title} - ${movie.genre}</li>`;
-          });
-          html += "</ul>";
-          $(".results").html(html);
-      });
-    }
-  </script>
+        var query = $("#movieSearch").val().trim();
+        if (query === "") {
+            alert("Please enter a movie name.");
+            return;
+        }
 
+        $("#loader").html("<h3>Loading...</h3>");
+        $("#error-message").hide();
+        $("#results").hide();
+
+        $.get("/search/", { movie: query }, function(data) {
+            $("#loader").html(""); // Clear loader
+
+            if (data.error) {
+                $("#error-message").show();
+                $(".results").html("");
+            } else {
+                $("#movie-title").text(data.title);
+                $("#movie-poster").attr("src", data.poster);
+                $("#movie-overview").text(data.overview);
+                $("#movie-genres").text("Genres: " + data.genres);
+                $("#movie-release-date").text("Release Date: " + data.release_date);
+                $("#movie-runtime").text("Runtime: " + data.runtime);
+                
+                $("#likes").text(data.likes.likes);
+                $("#dislikes").text(data.likes.dislikes);
+                $("#error-message").hide();
+                
+                // Load similar movies
+                let similarMoviesHtml = "";
+                for (let poster in data.similar_movies) {
+                    similarMoviesHtml += `<div class="col-md-3"><img src="${poster}" class="img-fluid rounded"></div>`;
+                }
+                $("#similar-movies").html(similarMoviesHtml);
+            }
+        }).fail(function() {
+            $("#loader").html(""); // Clear loader
+            $("#error-message").show();
+        });
+    }
+
+    function likeDislike(action) {
+    var movieId = $("#like-button").data("movie-id"); // Fetch stored movie ID
+    if (!movieId) return;
+
+    $.post("/like-dislike/", { movie_id: movieId, action: action }, function(data) {
+        $("#likes").text(data.likes);
+        $("#dislikes").text(data.dislikes);
+    });
+}
+  </script>
 </body>
 </html>

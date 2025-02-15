@@ -17,9 +17,11 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 from django.conf.urls.static import static
-from monvie_recommendation_app.views import HomeView
+from monvie_recommendation_app import views
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    path('', HomeView.as_view(), name='index'),
+    path("", views.HomeView.as_view(), name="home"),
+    path("search/", views.MovieSearchView.as_view(), name="movie_search"),
+
+    path("like-dislike/", views.LikeDislikeView.as_view(), name="like_dislike"),
 ]
