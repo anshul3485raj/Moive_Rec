@@ -20,63 +20,68 @@ class HomeView(View):
         return render(request, 'home.html')
 
 class MovieSearchView(View):
-    """Fetches movie details dynamically using TMDb API."""
     def get(self, request):
-        query = request.GET.get("movie", "").strip().lower()
+        query = request.GET.get("movie", "").strip()
         if not query:
             return JsonResponse({"error": "No movie name provided"}, status=400)
 
-        # TMDb Search API Call
+        # Search movie via TMDb API
         search_url = f"{TMDB_BASE_URL}/search/movie?api_key={TMDB_API_KEY}&query={query}"
         search_response = requests.get(search_url).json()
 
         if "results" not in search_response or not search_response["results"]:
             return JsonResponse({"error": "Movie not found"}, status=404)
 
-        # Get the first movie match
-        movie = search_response["results"][0]
-        movie_id = movie["id"]
+        movie_data = search_response["results"][0]
+        movie_id = movie_data["id"]
 
         # Fetch full movie details
         details_url = f"{TMDB_BASE_URL}/movie/{movie_id}?api_key={TMDB_API_KEY}&append_to_response=credits,reviews,recommendations,similar"
         details_response = requests.get(details_url).json()
 
-        # Extract relevant details
-        movie_data = {
-            "id": movie_id,
-            "title": details_response.get("title"),
-            "poster": f"https://image.tmdb.org/t/p/w500{details_response.get('poster_path')}" if details_response.get('poster_path') else "",
-            "overview": details_response.get("overview"),
-            "vote_average": details_response.get("vote_average"),
-            "vote_count": details_response.get("vote_count"),
-            "genres": ", ".join([genre["name"] for genre in details_response.get("genres", [])]),
-            "release_date": details_response.get("release_date"),
-            "runtime": f"{details_response.get('runtime')} min" if details_response.get("runtime") else "N/A",
-            "status": details_response.get("status"),
-            "likes": MOVIE_LIKES.get(movie_id, {"likes": 0, "dislikes": 0}),
-            "cast_details": {
-                cast["name"]: {
-                    "image": f"https://image.tmdb.org/t/p/w500{cast['profile_path']}" if cast.get('profile_path') else "",
-                    "character": cast["character"]
-                } for cast in details_response.get("credits", {}).get("cast", [])[:5]  # Top 5 Cast Members
-            },
-            "reviews": {
-                review["content"]: "Good" if review["author_details"].get("rating", 5) >= 5 else "Bad"
-                for review in details_response.get("reviews", {}).get("results", [])[:3]  # First 3 Reviews
-            },
-            "movie_cards": {
-                f"https://image.tmdb.org/t/p/w500{rec['poster_path']}": rec["title"]
-                for rec in details_response.get("recommendations", {}).get("results", [])[:4]  # First 4 Recommendations
-                if rec.get("poster_path")
+        # Extract fields
+        title = details_response.get("title")
+        genre = ", ".join([g["name"] for g in details_response.get("genres", [])])
+        release_date = details_response.get("release_date") or "2000-01-01"
+        runtime = details_response.get("runtime") or 0
+        description = details_response.get("overview")
+        poster_path = details_response.get("poster_path")
+        poster_url = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else ""
+
+        # Save to DB (or update if already exists)
+        movie, created = Movie.objects.get_or_create(
+            title=title,
+            defaults={
+                "genre": genre,
+                "release_date": release_date,
+                "runtime": runtime,
+                "description": description,
+                "poster_url": poster_url
+            }
+        )
+
+        # Save query to SearchHistory
+        SearchHistory.objects.create(user=None, query=query, timestamp=now())
+
+        return JsonResponse({
+            "id": movie.id,
+            "title": movie.title,
+            "poster": movie.poster_url,
+            "overview": movie.description,
+            "genres": movie.genre,
+            "release_date": str(movie.release_date),
+            "runtime": f"{movie.runtime} min",
+            "status": "Stored",
+            "likes": {
+                "likes": UserInteraction.objects.filter(movie=movie, liked=True).count(),
+                "dislikes": UserInteraction.objects.filter(movie=movie, disliked=True).count()
             },
             "similar_movies": {
                 f"https://image.tmdb.org/t/p/w500{sim['poster_path']}": sim["title"]
-                for sim in details_response.get("similar", {}).get("results", [])[:4]  # First 4 Similar Movies
+                for sim in details_response.get("similar", {}).get("results", [])[:4]
                 if sim.get("poster_path")
             }
-        }
-
-        return JsonResponse(movie_data)
+        })
 
 class LikeDislikeView(View):
     """Handles like and dislike functionality for movies."""
