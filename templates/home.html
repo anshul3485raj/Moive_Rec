@@ -39,8 +39,10 @@
   <div class="form-group text-center">
     <button class="btn btn-primary movie-button"
             style="background-color: #e50914; border-color: #e50914; width:120px;"
-            onclick="getRecommendations()">Enter
-    </button><br><br>
+            onclick="getRecommendations()">
+      Enter
+    </button>
+    <br><br>
   </div>
 
   <div id="loader" class="text-center"></div>
@@ -50,90 +52,162 @@
       Please check the spelling or try with other movies!</h3>
   </div>
 
-  <div class="results text-center">
+  <div class="results text-center" id="movie-overview2" style="visibility: hidden;">
     <h2 id="movie-title" class="text-uppercase"></h2>
     <img id="movie-poster" class="img-fluid rounded" alt="">
-    <div class="results text-center">
-    <p id="movie-overview" class="movie-overview"></p>
+    <input type="hidden" id="movie-id" value="">
+
+    <div id="movie-overview" style="display: none;">
+      <p>This is the movie overview content.</p>
+    </div>
+
     <h4 id="movie-genres" class="movie-details"></h4>
     <h4 id="movie-release-date" class="movie-details"></h4>
     <h4 id="movie-runtime" class="movie-details"></h4>
-</div>
 
     <!-- Like & Dislike Buttons -->
-<div id="like-dislike-section" class="mt-3 text-center">
-    <button id="like-button" onclick="likeDislike('like')" class="btn btn-success">
+    <div id="like-dislike-section" class="mt-3">
+      <button id="like-button" onclick="likeDislike('like')" class="btn btn-success">
         Like 👍 <span id="likes">0</span>
-    </button>
-    <button id="dislike-button" onclick="likeDislike('dislike')" class="btn btn-danger">
+      </button>
+      <button id="dislike-button" onclick="likeDislike('dislike')" class="btn btn-danger">
         Dislike 👎 <span id="dislikes">0</span>
-    </button>
-</div>
+      </button>
+    </div>
+
+    <!-- Watch Status -->
+    <div class="mt-2">
+      <button id="watched-button" onclick="markWatched()" class="btn btn-warning">
+        Mark as Watched 👀
+      </button>
+    </div>
+
+    <!-- Rating Dropdown -->
+    <div class="mt-3">
+      <label for="rating">Rate this movie:</label>
+      <select id="rating" onchange="submitRating()" class="form-control d-inline-block w-auto" style="width:200px;">
+        <option value="">--Select--</option>
+        <option value="1">⭐</option>
+        <option value="2">⭐⭐</option>
+        <option value="3">⭐⭐⭐</option>
+        <option value="4">⭐⭐⭐⭐</option>
+        <option value="5">⭐⭐⭐⭐⭐</option>
+      </select>
+    </div>
 
     <!-- Similar Movies Section -->
     <h3 class="mt-4">Similar Movies</h3>
     <div id="similar-movies" class="row justify-content-center"></div>
   </div>
 
+  <!-- JS Libraries -->
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
 
-  <script>
-      function getCSRFToken() {
-    return fetch("/like-dislike/")
-        .then(response => response.json())
-        .then(data => data.csrfToken);
-}
-    function getRecommendations() {
-        var query = $("#movieSearch").val().trim();
-        if (query === "") {
-            alert("Please enter a movie name.");
-            return;
-        }
+  <!-- JS Logic -->
+ <script>
 
-        $("#loader").html("<h3>Loading...</h3>");
-        $("#error-message").hide();
-        $("#results").hide();
-
-        $.get("/search/", { movie: query }, function(data) {
-            $("#loader").html(""); // Clear loader
-
-            if (data.error) {
-                $("#error-message").show();
-                $(".results").html("");
-            } else {
-                $("#movie-title").text(data.title);
-                $("#movie-poster").attr("src", data.poster);
-                $("#movie-overview").text(data.overview);
-                $("#movie-genres").text("Genres: " + data.genres);
-                $("#movie-release-date").text("Release Date: " + data.release_date);
-                $("#movie-runtime").text("Runtime: " + data.runtime);
-                
-                $("#likes").text(data.likes.likes);
-                $("#dislikes").text(data.likes.dislikes);
-                $("#error-message").hide();
-                
-                // Load similar movies
-                let similarMoviesHtml = "";
-                for (let poster in data.similar_movies) {
-                    similarMoviesHtml += `<div class="col-md-3"><img src="${poster}" class="img-fluid rounded"></div>`;
-                }
-                $("#similar-movies").html(similarMoviesHtml);
-            }
-        }).fail(function() {
-            $("#loader").html(""); // Clear loader
-            $("#error-message").show();
-        });
+  function getRecommendations() {
+       const overview = document.getElementById("movie-overview2");
+          overview.style.visibility = "visible"; // Make it visible
+    const query = $("#movieSearch").val().trim();
+    if (!query) {
+      alert("Please enter a movie name.");
+      return;
     }
 
-    function likeDislike(action) {
-    var movieId = $("#like-button").data("movie-id"); // Fetch stored movie ID
-    if (!movieId) return;
 
-    $.post("/like-dislike/", { movie_id: movieId, action: action }, function(data) {
-        $("#likes").text(data.likes);
-        $("#dislikes").text(data.dislikes);
+    $("#loader").html("<h3>Loading...</h3>");
+    $("#error-message").hide();
+    $(".results").hide();
+
+    $.get("/search/", { movie: query }, function(data) {
+      $("#loader").html("");
+
+      if (data.error) {
+        $("#error-message").show();
+        $(".results").hide();
+        return;
+      }
+
+      // Fill in movie info
+      $("#movie-title").text(data.title);
+      $("#movie-poster").attr("src", data.poster);
+      $("#movie-overview").text(data.overview).show();
+      $("#movie-genres").text("Genres: " + data.genres);
+      $("#movie-release-date").text("Release Date: " + data.release_date);
+      $("#movie-runtime").text("Runtime: " + data.runtime);
+      $("#movie-id").val(data.id);
+      $("#likes").text(data.likes.likes);
+      $("#dislikes").text(data.likes.dislikes);
+
+      // Show the result section
+      $(".results").show();
+
+      // Populate similar movies
+      let similarMoviesHtml = "";
+      for (let poster in data.similar_movies) {
+        similarMoviesHtml += `
+          <div class="col-md-3 mb-3">
+            <img src="${poster}" alt="${data.similar_movies[poster]}" class="img-fluid rounded">
+            <p style="color:white">${data.similar_movies[poster]}</p>
+          </div>`;
+      }
+      $("#similar-movies").html(similarMoviesHtml);
+    }).fail(function() {
+      $("#loader").html("");
+      $("#error-message").show();
     });
+  }
+function likeDislike(action) {
+  const movieId = $("#movie-id").val();
+  if (!movieId) return;
+
+  $.ajax({
+    url: "/like-dislike/",
+    method: "POST",
+    contentType: "application/json",
+    headers: {
+      "X-CSRFToken": getCookie("csrftoken"),
+    },
+    data: JSON.stringify({ movie_id: movieId, action: action }),
+    success: function (data) {
+      $("#likes").text(data.likes);
+      $("#dislikes").text(data.dislikes);
+      // Disable both buttons after successful interaction
+      $("#like-button").prop("disabled", true);
+      $("#dislike-button").prop("disabled", true);
+    },
+   error: function (xhr) {
+  if (xhr.status === 302 || xhr.responseText.includes("login")) {
+    alert("You must be logged in to like/dislike.");
+  } else {
+    const response = xhr.responseJSON || {};
+    alert(response.error || "Error updating like/dislike");
+  }
 }
-  </script>
+
+
+  });
+}
+
+// Utility for CSRF token
+function getCookie(name) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== "") {
+    const cookies = document.cookie.split(";");
+    for (let cookie of cookies) {
+      cookie = cookie.trim();
+      if (cookie.startsWith(name + "=")) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+}
+
+</script>
+
+
 </body>
 </html>

@@ -20,6 +20,7 @@ from django.conf.urls.static import static
 from monvie_recommendation_app import views
 
 urlpatterns = [
+path("like-dislike/", views.like_dislike_movie, name="like_dislike"),
     path("", views.HomeView.as_view(), name="home"),
     path("search/", views.MovieSearchView.as_view(), name="movie_search"),
 

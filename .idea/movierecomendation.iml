@@ -16,7 +16,7 @@
     <content url="file://$MODULE_DIR$">
       <excludeFolder url="file://$MODULE_DIR$/ENV" />
     </content>
-    <orderEntry type="jdk" jdkName="Python 3.12 (movierecomendation)" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="Python 3.8 (inter ve python)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
   <component name="TemplatesService">
